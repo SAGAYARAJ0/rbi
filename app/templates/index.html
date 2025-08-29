@@ -1,0 +1,872 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Header Section -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <!-- <div>
+            <h1 class="h3 mb-2 text-primary">
+                <i class="fas fa-tachometer-alt me-2"></i>
+                Dashboard
+            </h1>
+            <p class="text-muted mb-0">Welcome back! Here's your compliance overview</p>
+        </div> -->
+        <div class="d-flex">
+            <div class="dropdown me-3">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="filterDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-calendar-alt me-2"></i>Last 30 Days
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="filterDropdown">
+                    <li><a class="dropdown-item" href="#">Last 7 Days</a></li>
+                    <li><a class="dropdown-item active" href="#">Last 30 Days</a></li>
+                    <li><a class="dropdown-item" href="#">Last 90 Days</a></li>
+                    <li><a class="dropdown-item" href="#">This Year</a></li>
+                </ul>
+            </div>
+            <button class="btn btn-primary">
+                <i class="fas fa-download me-2"></i>Export Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row g-4 mb-4">
+        <!-- Node Counts Row -->
+        <div class="col-12 mb-3">
+            <h5 class="text-muted mb-3">Datas</h5>
+            <div class="row g-4">
+                <!-- Total Violations -->
+                <div class="col-md-4 col-lg-2">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-danger bg-opacity-10 p-2 rounded-circle me-2">
+                                    <i class="fas fa-exclamation-triangle text-danger"></i>
+                                </div>
+                                <div>
+                                    <h6 class="text-uppercase text-muted mb-0 small">Violations</h6>
+                                    <h4 class="mb-0">{{ "{:,}".format(total_violations or 0) }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Total Circulars -->
+                <div class="col-md-4 col-lg-2">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-info bg-opacity-10 p-2 rounded-circle me-2">
+                                    <i class="fas fa-file-alt text-info"></i>
+                                </div>
+                                <div>
+                                    <h6 class="text-uppercase text-muted mb-0 small">Circulars</h6>
+                                    <h4 class="mb-0">{{ "{:,}".format(total_circulars or 0) }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Legal Provisions -->
+                <div class="col-md-4 col-lg-2">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-success bg-opacity-10 p-2 rounded-circle me-2">
+                                    <i class="fas fa-gavel text-success"></i>
+                                </div>
+                                <div>
+                                    <h6 class="text-uppercase text-muted mb-0 small">Legal Provisions</h6>
+                                    <h4 class="mb-0">{{ "{:,}".format(total_legal_provisions or 0) }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Penalty Ranges -->
+                <div class="col-md-4 col-lg-2">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-warning bg-opacity-10 p-2 rounded-circle me-2">
+                                    <i class="fas fa-money-bill-wave text-warning"></i>
+                                </div>
+                                <div>
+                                    <h6 class="text-uppercase text-muted mb-0 small">Penalty Ranges</h6>
+                                    <h4 class="mb-0">{{ "{:,}".format(total_penalties or 0) }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Reasons -->
+                <div class="col-md-4 col-lg-2">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-primary bg-opacity-10 p-2 rounded-circle me-2">
+                                    <i class="fas fa-comment-dots text-primary"></i>
+                                </div>
+                                <div>
+                                    <h6 class="text-uppercase text-muted mb-0 small">Reasons</h6>
+                                    <h4 class="mb-0">{{ "{:,}".format(total_reasons or 0) }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Compliance Rules -->
+                <div class="col-md-4 col-lg-2">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="d-flex align-items-center">
+                                <div class="bg-purple bg-opacity-10 p-2 rounded-circle me-2">
+                                    <i class="fas fa-shield-alt text-purple"></i>
+                                </div>
+                                <div>
+                                    <h6 class="text-uppercase text-muted mb-0 small">Compliance Rules</h6>
+                                    <h4 class="mb-0">{{ "{:,}".format(total_compliance_rules or 0) }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+  
+
+
+    <!-- Document Processing Section -->
+    <div class="card border-0 shadow-sm mb-2">
+        <div class="card-header bg-white border-0 py-3">
+            <h5 class="mb-0 text-primary">
+                <i class="fas fa-file-upload me-2"></i>Document Processing
+            </h5>
+        </div>
+        <div class="card-body p-1">
+            <div class="row g-4">
+                <!-- Excel Upload Card -->
+                <div class="col-md-6">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body d-flex flex-column p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-success bg-opacity-10 p-3 rounded-circle me-3">
+                                    <i class="fas fa-file-excel fa-lg text-success"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0 fw-bold">Rule Extractor</h5>
+                                    <p class="text-muted small mb-0">Extract fine information from RBI PDFs</p>
+                                </div>
+                            </div>
+                            <p class="text-muted mb-4">Upload RBI PDF documents to extract fine information using AI-powered analysis. The system will automatically process and categorize the fines for compliance monitoring.</p>
+                            <div class="mt-auto">
+                                <a href="{{ url_for('main.upload') }}" class="btn btn-primary w-100">
+                                    <i class="fas fa-upload me-2"></i>Go to Upload PDF
+                                </a>
+                                <div class="mt-2 text-center">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1"></i> Supports .pdf files up to 50MB
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Excel Upload Card -->
+                <div class="col-md-6">
+                    <div class="card h-100 border-0 shadow-sm">
+                        <div class="card-body d-flex flex-column p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-success bg-opacity-10 p-3 rounded-circle me-3">
+                                    <i class="fas fa-file-excel fa-lg text-success"></i>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0 fw-bold">Extract Transaction Rulebased</h5>
+                                    <p class="text-muted small mb-0">Analyze transaction data for compliance</p>
+                                </div>
+                            </div>
+                            <p class="text-muted mb-4">Upload Excel files to process transaction data and check for compliance issues. The system will analyze transactions and flag any potential violations.</p>
+                            <div class="mt-auto">
+                                <a href="{{ url_for('main.excel_upload') }}" class="btn btn-success w-100">
+                                    <i class="fas fa-upload me-2"></i>Go to Upload Excel
+                                </a>
+                                <div class="mt-2 text-center">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1"></i> Supports .xlsx and .xls files
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row g-4 mb-4">
+        <!-- Fines Trend Chart -->
+        <div class="col-xl-8">
+            <div class="card h-100">
+                <div class="card-header bg-white border-0">
+                    <h5 class="card-title mb-0">Fines Trend</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="finesTrendChart" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Violation Types Pie Chart -->
+        <div class="col-xl-4">
+            <div class="card h-100">
+                <div class="card-header bg-white border-0">
+                    <h5 class="card-title mb-0">Top Violation Types</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="violationTypesChart" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Relationship Distribution Chart -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card h-100">
+                <div class="card-header bg-white border-0">
+                    <h5 class="card-title mb-0">Relationship Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="relationshipChart" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Row -->
+    <div class="row g-4">
+        <!-- Recent Fines -->
+        <div class="col-xl-6">
+            <div class="card h-100">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Recent Fines</h5>
+                    <a href="#" class="btn btn-sm btn-outline-primary" id="refreshFines">
+                        <i class="fas fa-sync-alt me-1"></i> Refresh
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="recentFinesTable">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Violation</th>
+                                    <th>Amount</th>
+                                    <th>Circular</th>
+                                </tr>
+                            </thead>
+                            <tbody id="finesTableBody">
+                                <tr>
+                                    <td colspan="3" class="text-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+               
+            </div>
+        </div>
+        
+        <!-- Fine Details Modal -->
+        <div class="modal fade" id="fineDetailsModal" tabindex="-1" aria-labelledby="fineDetailsModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="fineDetailsModalLabel">
+                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                            Fine Details
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fine-detail-label">Violation Type</label>
+                                    <p class="mb-0 fine-detail-value" id="modalViolationType">-</p>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fine-detail-label">Legal Provision</label>
+                                    <p class="mb-0 fine-detail-value" id="modalLegalProvision">-</p>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fine-detail-label">Circular/Direction</label>
+                                    <p class="mb-0 fine-detail-value" id="modalCircular">-</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label fine-detail-label">Penalty Amount</label>
+                                    <p class="mb-0">
+                                        <span class="badge bg-danger bg-opacity-10 text-danger fs-6" id="modalAmount">₹0</span>
+                                    </p>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fine-detail-label">Currency</label>
+                                    <p class="mb-0 fine-detail-value" id="modalCurrency">-</p>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fine-detail-label">Page Reference</label>
+                                    <p class="mb-0 fine-detail-value" id="modalPage">-</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label class="form-label fine-detail-label">Reason/Description</label>
+                                    <p class="mb-0 fine-detail-value" id="modalReason">-</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="mb-3">
+                                    <label class="form-label fine-detail-label">Additional Details</label>
+                                    <div class="bg-light p-3 rounded" id="modalAdditionalDetails">
+                                        <small class="text-muted">No additional details available</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" id="modalViewDocument">
+                            <i class="fas fa-file-pdf me-2"></i>View Document
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Items -->
+        <div class="col-xl-6">
+            <div class="card h-100">
+                <div class="card-header bg-white border-0">
+                    <h5 class="card-title mb-0">Action Items</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <div class="list-group-item px-0">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0 me-3">
+                                    <div class="bg-primary bg-opacity-10 p-2 rounded">
+                                        <i class="fas fa-exclamation-circle text-primary"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">5 Pending Approvals</h6>
+                                    <p class="mb-0 small text-muted">Action required for pending fine settlements</p>
+                                </div>
+                                <div class="text-end">
+                                    <a href="#" class="btn btn-sm btn-outline-primary">Review</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="list-group-item px-0">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0 me-3">
+                                    <div class="bg-warning bg-opacity-10 p-2 rounded">
+                                        <i class="fas fa-clock text-warning"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">3 Reports Due</h6>
+                                    <p class="mb-0 small text-muted">Monthly compliance reports pending submission</p>
+                                </div>
+                                <div class="text-end">
+                                    <a href="#" class="btn btn-sm btn-outline-primary">View</a>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="list-group-item px-0">
+                            <div class="d-flex align-items-center">
+                                <div class="flex-shrink-0 me-3">
+                                    <div class="bg-info bg-opacity-10 p-2 rounded">
+                                        <i class="fas fa-bell text-info"></i>
+                                    </div>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">System Update Available</h6>
+                                    <p class="mb-0 small text-muted">Update to the latest version for new features</p>
+                                </div>
+                                <div class="text-end">
+                                    <a href="#" class="btn btn-sm btn-outline-primary">Update</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+</div>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+
+<!-- Bootstrap JS and dependencies -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Database Log Button -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <button type="button" class="btn btn-info" id="viewDbLogs" data-bs-toggle="tooltip" data-bs-placement="left" title="View Database Contents">
+        <i class="fas fa-database me-1"></i> DB Logs
+    </button>
+</div>
+
+<!-- Database Logs Modal -->
+<div class="modal fade" id="dbLogsModal" tabindex="-1" aria-labelledby="dbLogsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="dbLogsModalLabel">Database Contents</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Nodes</h6>
+                        <pre id="nodeData" class="bg-light p-3" style="max-height: 300px; overflow-y: auto;">Loading node data...</pre>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Relationships</h6>
+                        <pre id="relData" class="bg-light p-3" style="max-height: 300px; overflow-y: auto;">Loading relationship data...</pre>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="copyToClipboard()">
+                    <i class="fas fa-copy me-1"></i> Copy to Clipboard
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Initialize tooltips
+var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new bootstrap.Tooltip(tooltipTriggerEl)
+});
+
+// Handle database log button click
+document.getElementById('viewDbLogs').addEventListener('click', function() {
+    const modal = new bootstrap.Modal(document.getElementById('dbLogsModal'));
+    
+    // Show loading state
+    document.getElementById('nodeData').textContent = 'Loading node data...';
+    document.getElementById('relData').textContent = 'Loading relationship data...';
+    
+    // Fetch database contents
+    fetch('/api/database/log')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Format and display node data
+                let nodeText = '';
+                for (const [label, count] of Object.entries(data.data.node_counts)) {
+                    nodeText += `${label}: ${count}\n`;
+                }
+                document.getElementById('nodeData').textContent = nodeText || 'No nodes found';
+                
+                // Format and display relationship data
+                let relText = '';
+                for (const [rel, count] of Object.entries(data.data.relationship_counts)) {
+                    relText += `${rel}: ${count}\n`;
+                }
+                document.getElementById('relData').textContent = relText || 'No relationships found';
+            } else {
+                document.getElementById('nodeData').textContent = 'Error: ' + (data.message || 'Unknown error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('nodeData').textContent = 'Error fetching database data';
+        });
+        
+    modal.show();
+});
+
+// Copy to clipboard function
+function copyToClipboard() {
+    const nodeData = document.getElementById('nodeData').textContent;
+    const relData = document.getElementById('relData').textContent;
+    const textToCopy = `=== NODES ===\n${nodeData}\n\n=== RELATIONSHIPS ===\n${relData}`;
+    
+    navigator.clipboard.writeText(textToCopy).then(() => {
+        // Show copied message
+        const copyBtn = document.querySelector('#dbLogsModal .btn-primary');
+        const originalText = copyBtn.innerHTML;
+        copyBtn.innerHTML = '<i class="fas fa-check me-1"></i> Copied!';
+        setTimeout(() => {
+            copyBtn.innerHTML = originalText;
+        }, 2000);
+    });
+}
+
+// Function to load recent fines
+function loadRecentFines() {
+    const tbody = document.getElementById('finesTableBody');
+    
+    // Show loading state
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="3" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            </td>
+        </tr>`;
+    
+    // Fetch recent fines data
+    fetch('/api/recent-fines')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            
+            if (data.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="text-center py-4 text-muted">
+                            <i class="fas fa-inbox me-2"></i> No fines data available
+                        </td>
+                    </tr>`;
+                return;
+            }
+            
+            // Clear loading state
+            tbody.innerHTML = '';
+            
+            // Add rows for each fine
+            data.forEach(fine => {
+                const row = document.createElement('tr');
+                row.className = 'align-middle';
+                row.style.cursor = 'pointer';
+                row.innerHTML = `
+                    <td>
+                        <div class="fw-semibold text-truncate" style="max-width: 200px;" title="${fine.violation || 'N/A'}">
+                            ${fine.violation || 'N/A'}
+                        </div>
+                        <small class="text-muted">${fine.legal_provision || ''}</small>
+                    </td>
+                    <td class="text-nowrap">
+                        <span class="badge bg-danger bg-opacity-10 text-danger">
+                            ₹${fine.amount.toLocaleString() || '0'}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="text-truncate" style="max-width: 150px;" title="${fine.circular || 'N/A'}">
+                            ${fine.circular || 'N/A'}
+                        </div>
+                    </td>
+                `;
+                
+                // Add click event to show modal
+                row.addEventListener('click', () => {
+                    showFineDetailsModal(fine);
+                });
+                
+                // Add hover effect
+                row.addEventListener('mouseenter', () => {
+                    row.style.backgroundColor = '#f8f9fa';
+                });
+                row.addEventListener('mouseleave', () => {
+                    row.style.backgroundColor = '';
+                });
+                
+                tbody.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading recent fines:', error);
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="3" class="text-center py-4 text-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Failed to load fines data
+                    </td>
+                </tr>`;
+        });
+}
+
+// Function to show fine details modal
+function showFineDetailsModal(fine) {
+    // Populate modal with fine data
+    document.getElementById('modalViolationType').textContent = fine.violation || 'N/A';
+    document.getElementById('modalLegalProvision').textContent = fine.legal_provision || 'N/A';
+    document.getElementById('modalCircular').textContent = fine.circular || 'N/A';
+    document.getElementById('modalAmount').textContent = `₹${fine.amount ? fine.amount.toLocaleString() : '0'}`;
+    document.getElementById('modalCurrency').textContent = fine.currency || 'INR';
+    document.getElementById('modalPage').textContent = fine.page || 'N/A';
+    document.getElementById('modalReason').textContent = fine.reason || 'N/A';
+    
+    // Handle additional details
+    const additionalDetails = document.getElementById('modalAdditionalDetails');
+    if (fine.normalized_amount && (fine.normalized_amount.lower || fine.normalized_amount.upper)) {
+        let amountRange = '';
+        if (fine.normalized_amount.lower && fine.normalized_amount.upper) {
+            amountRange = `Range: ₹${fine.normalized_amount.lower.toLocaleString()} - ₹${fine.normalized_amount.upper.toLocaleString()}`;
+        } else if (fine.normalized_amount.lower) {
+            amountRange = `Minimum: ₹${fine.normalized_amount.lower.toLocaleString()}`;
+        } else if (fine.normalized_amount.upper) {
+            amountRange = `Maximum: ₹${fine.normalized_amount.upper.toLocaleString()}`;
+        }
+        additionalDetails.innerHTML = `
+            <div class="mb-2">
+                <strong>Amount Range:</strong> ${amountRange}
+            </div>
+            <div class="mb-2">
+                <strong>ID:</strong> ${fine.id || 'N/A'}
+            </div>
+            <div class="mb-2">
+                <strong>Extracted Date:</strong> ${new Date().toLocaleDateString()}
+            </div>
+        `;
+    } else {
+        additionalDetails.innerHTML = `
+            <div class="mb-2">
+                <strong>ID:</strong> ${fine.id || 'N/A'}
+            </div>
+            <div class="mb-2">
+                <strong>Extracted Date:</strong> ${new Date().toLocaleDateString()}
+            </div>
+        `;
+    }
+    
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('fineDetailsModal'));
+    modal.show();
+    
+    // Store fine data for document viewing
+    document.getElementById('fineDetailsModal').dataset.fineId = fine.id;
+    document.getElementById('fineDetailsModal').dataset.fineData = JSON.stringify(fine);
+}
+
+// Initialize charts and load recent fines when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Load recent fines
+    loadRecentFines();
+    
+    // Add click handler for refresh button
+    document.getElementById('refreshFines')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        loadRecentFines();
+    });
+    
+    // Add click handler for modal view document button
+    document.getElementById('modalViewDocument')?.addEventListener('click', function() {
+        const modal = document.getElementById('fineDetailsModal');
+        const fineData = JSON.parse(modal.dataset.fineData || '{}');
+        
+        if (fineData.document_path) {
+            // Open document in new tab
+            window.open(fineData.document_path, '_blank');
+        } else {
+            // Show message if no document available
+            alert('Document not available for this fine.');
+        }
+    });
+    
+    // Fetch graph data from the API
+    fetch('/api/graph-data')
+        .then(response => response.json())
+        .then(data => {
+            // Initialize charts with the fetched data
+            initFinesTrendChart(data.fines_trend);
+            initViolationTypesChart(data.violation_types);
+            initRelationshipChart(data.relationship_distribution);
+        })
+        .catch(error => {
+            console.error('Error fetching graph data:', error);
+        });
+});
+
+// Fines Trend Line Chart
+function initFinesTrendChart(finesData) {
+    const ctx = document.getElementById('finesTrendChart').getContext('2d');
+    
+    // Process data for chart
+    const labels = finesData.map(item => item.date || 'No Date');
+    const amounts = finesData.map(item => item.amount || 0);
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Fines Amount (₹)',
+                data: amounts,
+                borderColor: '#4285f4',
+                backgroundColor: 'rgba(66, 133, 244, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    callbacks: {
+                        label: function(context) {
+                            return `₹${context.raw.toLocaleString()}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.05)'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return '₹' + value.toLocaleString();
+                        }
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Violation Types Pie Chart
+function initViolationTypesChart(violationData) {
+    const ctx = document.getElementById('violationTypesChart').getContext('2d');
+    
+    // Process data for chart
+    const labels = violationData.map(item => item.type || 'Unknown');
+    const counts = violationData.map(item => item.count || 0);
+    
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: counts,
+                backgroundColor: [
+                    '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b',
+                    '#5a5c69', '#858796', '#3a3b45', '#00b3b3', '#ff80ab'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.raw || 0;
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const percentage = Math.round((value / total) * 100);
+                            return `${label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Relationship Distribution Bar Chart
+function initRelationshipChart(relationshipData) {
+    const ctx = document.getElementById('relationshipChart').getContext('2d');
+    
+    const labels = Object.keys(relationshipData);
+    const counts = Object.values(relationshipData);
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Count',
+                data: counts,
+                backgroundColor: '#4e73df',
+                borderColor: '#4e73df',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `Count: ${context.raw}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+</script>
+{% endblock %}

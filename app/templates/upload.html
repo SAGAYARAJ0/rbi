@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3><i class="fas fa-upload me-2"></i>Upload RBI PDF Document</h3>
+            </div>
+            <div class="card-body">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="fileInput" class="form-label">Select PDF File</label>
+                        <input class="form-control" type="file" id="fileInput" accept=".pdf" required>
+                        <div class="form-text">Only PDF files are accepted</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane me-2"></i>Upload and Process
+                    </button>
+                </form>
+                
+                <div id="progressSection" class="mt-4 d-none">
+                    <div class="d-flex justify-content-between">
+                        <span>Processing your document...</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 25px;">
+                        <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <div id="statusMessage" class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>Uploading file...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Compliance Rules Section -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Compliance Rules</h3>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#rulesCollapse" aria-expanded="true" aria-controls="rulesCollapse">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
+            </div>
+            <div class="collapse show" id="rulesCollapse">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th width="120">Rule ID</th>
+                                    <th>Rule Name</th>
+                                    <!-- <th>Description</th> -->
+                                    <!-- <th width="120">Risk Level</th> -->
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for rule in compliance_rules %}
+                                <tr>
+                                    <td><code>{{ rule.id }}</code></td>
+                                    <td>{{ rule.name }}</td>
+                                    <!-- <td>{{ rule.description }}</td> -->
+                                    <!-- <td>
+                                        {% if rule.risk == 'CRITICAL' %}
+                                            <span class="badge bg-danger">{{ rule.risk }}</span>
+                                        {% elif rule.risk == 'HIGH' %}
+                                            <span class="badge bg-warning text-dark">{{ rule.risk }}</span>
+                                        {% elif rule.risk == 'MEDIUM' %}
+                                            <span class="badge bg-info">{{ rule.risk }}</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ rule.risk }}</span>
+                                        {% endif %}
+                                    </td> -->
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

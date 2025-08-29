@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto text-center">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-cogs me-2"></i>Processing Document</h3>
+            </div>
+            <div class="card-body">
+                <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <h4 id="statusText">Processing your document...</h4>
+                <div class="progress mb-3 mt-4" style="height: 25px;">
+                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 0%">0%</div>
+                </div>
+                <div id="errorSection" class="alert alert-danger d-none">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <span id="errorMessage"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // This page will be shown while processing
+    // JavaScript will handle the API calls and redirect when done
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get the filename from the URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const filename = urlParams.get('file');
+        
+        if (!filename) {
+            showError('No file specified for processing');
+            return;
+        }
+        
+        // Start processing
+        processDocument(filename);
+    });
+    
+    function processDocument(filename) {
+        updateProgress(30, 'Extracting Rules from Excel...');
+        
+        fetch('/api/process', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ filename: filename })
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => { throw new Error(err.error) });
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                updateProgress(100, 'Processing complete!');
+                // Redirect to results page after a short delay
+                setTimeout(() => {
+                    window.location.href = `/results?file=${data.results_file}&data=${encodeURIComponent(JSON.stringify(data.data))}`;
+                }, 1000);
+            } else {
+                throw new Error(data.error || 'Processing failed');
+            }
+        })
+        .catch(error => {
+            showError(error.message);
+        });
+    }
+    
+    function updateProgress(percent, message) {
+        document.getElementById('progressBar').style.width = `${percent}%`;
+        document.getElementById('progressBar').textContent = `${percent}%`;
+        document.getElementById('statusText').textContent = message;
+    }
+    
+    function showError(message) {
+        document.getElementById('errorMessage').textContent = message;
+        document.getElementById('errorSection').classList.remove('d-none');
+        document.getElementById('progressBar').classList.remove('progress-bar-animated');
+        document.getElementById('progressBar').classList.add('bg-danger');
+    }
+</script>
+{% endblock %}

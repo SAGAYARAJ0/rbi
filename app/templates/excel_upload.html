@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-lg">
+                <div class="card-header bg-success text-white py-3">
+                    <h3 class="mb-0"><i class="fas fa-file-excel me-3"></i>Excel Data Processing</h3>
+                </div>
+                <div class="card-body p-5">
+                    <p class="text-muted mb-4">Upload an Excel file (.xlsx or .xls) to process transaction data and check for compliance issues.</p>
+                    
+                    <form id="excel-upload-form" enctype="multipart/form-data">
+                        <div class="mb-4">
+                            <label for="excelFile" class="form-label h5 mb-3">Select Excel File to Upload</label>
+                            <div class="input-group input-group-lg">
+                                <input type="file" class="form-control form-control-lg" id="excelFile" name="excelFile" accept=".xlsx,.xls" required>
+                            </div>
+                            <div class="form-text mt-2">
+                                <i class="fas fa-info-circle me-2"></i>Supported formats: .xlsx, .xls (Max size: 10MB)
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-upload me-2"></i>Upload & Process
+                            </button>
+                            <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+                            </a>
+                        </div>
+                        
+                        <div class="progress mt-4" id="upload-progress-bar" style="height: 10px; display: none;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%" id="progress-bar-inner"></div>
+                        </div>
+                    </form>
+                    
+                    <div id="excel-results" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+$(document).ready(function() {
+    // Form submission handler
+    $('#excel-upload-form').on('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData();
+        const fileInput = document.getElementById('excelFile');
+        
+        if (fileInput.files.length === 0) {
+            showAlert('Please select an Excel file to upload.', 'danger');
+            return;
+        }
+        
+        formData.append('file', fileInput.files[0]);
+        
+        // Show progress bar and reset
+        progressBar.show();
+        progressBarInner.width('0%').text('0%');
+        resultsDiv.html('');
+        
+        // Disable form during upload
+        form.find('button[type="submit"]').prop('disabled', true)
+            .html('<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Processing...');
+        
+        // Make AJAX request
+        $.ajax({
+            url: '{{ url_for("main.api_excel_process") }}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            xhr: function() {
+                const xhr = new window.XMLHttpRequest();
+                xhr.upload.addEventListener('progress', function(e) {
+                    if (e.lengthComputable) {
+                        const percent = Math.round((e.loaded / e.total) * 100);
+                        progressBarInner.width(percent + '%').text(percent + '%');
+                    }
+                }, false);
+                return xhr;
+            },
+            success: function(response) {
+                if (response.status === 'success') {
+                    showResults(response.data);
+                    showAlert('File processed successfully!', 'success');
+                } else {
+                    showAlert('Error: ' + (response.message || 'Unknown error occurred'), 'danger');
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'Error processing file. ';
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    errorMsg += response.message || xhr.statusText;
+                } catch (e) {
+                    errorMsg += xhr.statusText;
+                }
+                showAlert(errorMsg, 'danger');
+            },
+            complete: function() {
+                progressBar.hide();
+                form.find('button[type="submit"]').prop('disabled', false)
+                    .html('<i class="fas fa-upload me-2"></i>Upload & Process');
+            }
+        });
+    });
+    
+    // Show alert function
+    function showAlert(message, type) {
+        const alertHtml = '<div class="alert alert-' + type + ' alert-dismissible fade show" role="alert">' +
+                        message +
+                        '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>' +
+                        '</div>';
+        
+        // Remove any existing alerts
+        $('.alert-dismissible').alert('close');
+        
+        // Add new alert
+        $('.card-body').prepend(alertHtml);
+        
+        // Auto-hide after 5 seconds
+        setTimeout(function() {
+            $('.alert-dismissible').alert('close');
+        }, 5000);
+    }
+    
+    // Show results function
+    function showResults(data) {
+        let html = '<div class="mt-4">';
+        
+        // Display summary
+        html += '<div class="card mb-4">' +
+                '<div class="card-header bg-primary text-white">' +
+                '<h4 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Analysis Results</h4>' +
+                '</div>' +
+                '<div class="card-body">' +
+                '<div class="row">' +
+                '<div class="col-md-4">' +
+                '<div class="alert alert-success">' +
+                '<h5><i class="fas fa-check-circle me-2"></i>Valid Transactions</h5>' +
+                '<p class="h2">' + (data.summary.valid_count || 0) + '</p>' +
+                '</div></div>' +
+                '<div class="col-md-4">' +
+                '<div class="alert alert-warning">' +
+                '<h5><i class="fas fa-exclamation-triangle me-2"></i>Warnings</h5>' +
+                '<p class="h2">' + (data.summary.warning_count || 0) + '</p>' +
+                '</div></div>' +
+                '<div class="col-md-4">' +
+                '<div class="alert alert-danger">' +
+                '<h5><i class="fas fa-exclamation-circle me-2"></i>Violations</h5>' +
+                '<p class="h2">' + (data.summary.violation_count || 0) + '</p>' +
+                '</div></div>' +
+                '</div>' + // Close col-md-4
+                '</div>' + // Close row
+                '</div>' + // Close card-body
+                '</div>'; // Close card
+        
+        // Check for monthly deposit limit violations
+        if (data.monthly_limit_violations && Object.keys(data.monthly_limit_violations).length > 0) {
+            html += '<div class="mt-4">' +
+                    '<div class="alert alert-danger">' +
+                    '<h5><i class="fas fa-exclamation-triangle me-2"></i>Monthly Deposit Limit Violations Detected</h5>' +
+                    '<p>The following accounts have exceeded the monthly deposit limit of ₹30,000:</p>' +
+                    '</div>' +
+                    '<div class="table-responsive">' +
+                    '<table class="table table-bordered table-hover">' +
+                    '<thead class="table-dark">' +
+                    '<tr>' +
+                    '<th>Account Number</th>' +
+                    '<th>Month</th>' +
+                    '<th>Total Deposits</th>' +
+                    '<th>Excess Amount</th>' +
+                    '<th>Penalty Range</th>' +
+                    '</tr>' +
+                    '</thead>' +
+                    '<tbody>';
+
+            // Add each violation to the table
+            Object.entries(data.monthly_limit_violations).forEach(function([account, violations]) {
+                violations.forEach(function(violation) {
+                    const penaltyMin = violation.penalty_min ? '₹' + violation.penalty_min.toLocaleString('en-IN') : '₹25,000';
+                    const penaltyMax = violation.penalty_max ? '₹' + violation.penalty_max.toLocaleString('en-IN') : '₹1,00,000';
+                    const penaltyRange = penaltyMin + ' - ' + penaltyMax;
+                    
+                    html += '<tr class="table-danger">' +
+                            '<td>' + account + '</td>' +
+                            '<td>' + (violation.month || 'N/A') + '</td>' +
+                            '<td>₹' + parseFloat(violation.total_deposits || 0).toLocaleString('en-IN') + '</td>' +
+                            '<td class="fw-bold">₹' + parseFloat(violation.excess_amount || 0).toLocaleString('en-IN') + '</td>' +
+                            '<td>' + penaltyRange + '</td>' +
+                            '</tr>';
+                });
+            });
+
+            html += '</tbody>' +
+                    '</table>' +
+                    '</div>' +
+                    '<div class="alert alert-info mt-3">' +
+                    '<i class="fas fa-info-circle me-2"></i>' +
+                    '<strong>Note:</strong> These violations are based on RBI guidelines for digital lending and transaction monitoring. ' +
+                    'Please review each case and take appropriate action.' +
+                    '</div>' +
+                    '</div>';
+        }
+        
+        // Initialize violations array if not exists
+        const violations = data.violations || [];
+        
+        if (violations.length > 0) {
+            html += '<div class="table-responsive">' +
+                    '<table class="table table-bordered table-hover">' +
+                    '<thead class="table-dark">' +
+                    '<tr>' +
+                    '<th>Transaction ID</th>' +
+                    '<th>Account</th>' +
+                    '<th>Amount</th>' +
+                    '<th>Date</th>' +
+                    '<th>Violations</th>' +
+                    '</tr>' +
+                    '</thead>' +
+                    '<tbody>';
+            
+            violations.forEach(function(violation) {
+                const violationList = violation.violation_details ? 
+                    violation.violation_details.map(function(v) {
+                        return '<span class="badge bg-danger me-1 mb-1">' + (v.violation_type || 'Violation') + '</span>';
+                    }).join('') : 
+                    '<span class="text-muted">None</span>';
+                
+                html += '<tr class="' + (violation.has_violation ? 'table-danger' : '') + '">' +
+                    '<td>' + (violation.transaction_id || 'N/A') + '</td>' +
+                    '<td>' + (violation.sender_account || 'N/A') + '</td>' +
+                    '<td class="text-end">₹' + (parseFloat(violation.amount) || 0).toLocaleString('en-IN') + '</td>' +
+                    '<td>' + (violation.date || 'N/A') + '</td>' +
+                    '<td>' + violationList + '</td>' +
+                    '</tr>';
+                
+                // Add violation details if any
+                if (violation.has_violation && violation.violation_details && violation.violation_details.length > 0) {
+                    html += '<tr class="table-active">' +
+                        '<td colspan="5" class="p-0">' +
+                        '<div class="p-3 bg-light">' +
+                        '<h6>Violation Details:</h6>' +
+                        '<div class="row">';
+                    
+                    violation.violation_details.forEach(function(detail) {
+                        html += '<div class="col-md-6 mb-3">' +
+                            '<div class="card">' +
+                            '<div class="card-header bg-danger text-white py-2">' +
+                            '<strong>' + (detail.violation_type || 'Violation') + '</strong>' +
+                            '</div>' +
+                            '<div class="card-body p-3">' +
+                            '<p class="mb-1"><strong>Reason:</strong> ' + (detail.reason || 'N/A') + '</p>' +
+                            '<p class="mb-1"><strong>Legal Provision:</strong> ' + (detail.legal_provision || 'N/A') + '</p>' +
+                            '<p class="mb-1"><strong>Penalty:</strong> ₹' + (detail.penalty_min || 0) + ' - ₹' + (detail.penalty_max || 0) + '</p>';
+                        
+                        if (detail.excess_amount) {
+                            html += '<p class="mb-0"><strong>Excess Amount:</strong> ₹' + parseFloat(detail.excess_amount || 0).toLocaleString('en-IN') + '</p>';
+                        }
+                        
+                        html += '</div></div></div>';
+                    });
+                    
+                    html += '</div></div></td></tr>';
+                }
+            });
+            
+            html += '</tbody></table></div>';
+        } else {
+            html += '<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i> No violations found in the uploaded file.</div>';
+        }
+        
+        // Add export button if there are results
+        if (violations.length > 0) {
+            html += '<div class="text-end mt-3">' +
+                '<button id="export-pdf" class="btn btn-danger me-2">' +
+                '<i class="fas fa-file-pdf me-2"></i>Export as PDF' +
+                '</button>' +
+                '<button id="export-excel" class="btn btn-success">' +
+                '<i class="fas fa-file-excel me-2"></i>Export as Excel' +
+                '</button>' +
+                '</div>' +
+                '<div id="export-script-container"></div>';
+            
+            // Add export functionality after the HTML is rendered
+            setTimeout(function() {
+                // PDF Export
+                document.getElementById('export-pdf').addEventListener('click', function() {
+                    alert('PDF export functionality will be implemented here');
+                    // TODO: Implement PDF export
+                });
+                
+                // Excel Export
+                document.getElementById('export-excel').addEventListener('click', function() {
+                    let csv = 'Transaction ID,Account,Amount,Date,Violation Type,Reason,Penalty\n';
+                    
+                    // Get all table rows
+                    const rows = document.querySelectorAll('table tbody tr');
+                    
+                    rows.forEach(function(row) {
+                        const cols = row.querySelectorAll('td');
+                        
+                        if (cols.length >= 5) {
+                            const txnId = cols[0].textContent.trim();
+                            const account = cols[1].textContent.trim();
+                            const amount = cols[2].textContent.trim();
+                            const date = cols[3].textContent.trim();
+                            const violations = [];
+                            
+                            // Get all violations for this row
+                            let nextRow = row.nextElementSibling;
+                            if (nextRow && nextRow.classList.contains('table-active')) {
+                                const cards = nextRow.querySelectorAll('.card');
+                                cards.forEach(function(card) {
+                                    const type = card.querySelector('.card-header').textContent.trim();
+                                    const reasonP = Array.from(card.querySelectorAll('p')).find(p => p.textContent.includes('Reason:'));
+                                    const reason = reasonP ? reasonP.textContent.replace('Reason:', '').trim() : '';
+                                    const penaltyP = Array.from(card.querySelectorAll('p')).find(p => p.textContent.includes('Penalty:'));
+                                    const penalty = penaltyP ? penaltyP.textContent.replace('Penalty:', '').trim() : '';
+                                    violations.push(type + ': ' + reason + ' (' + penalty + ')');
+                                });
+                            }
+                            
+                            const violationText = violations.length > 0 ? violations.join('; ') : 'None';
+                            
+                            // Escape quotes and format CSV line
+                            csv += '"' + txnId.replace(/"/g, '""') + '",';
+                            csv += '"' + account.replace(/"/g, '""') + '",';
+                            csv += '"' + amount.replace(/"/g, '""') + '",';
+                            csv += '"' + date.replace(/"/g, '""') + '",';
+                            csv += '"' + violationText.replace(/"/g, '""') + '\n';
+                        }
+                    });
+                    
+                    // Create download link
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'transaction_violations_' + new Date().toISOString().slice(0, 10) + '.csv';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                });
+            }, 0);
+        }
+        
+        // Close container div
+        html += '</div>';
+        
+        // Update the results div with the generated HTML
+        const resultsDiv = document.getElementById('results');
+        if (resultsDiv) {
+            resultsDiv.innerHTML = html;
+        }
+    }
+});
+</script>
+{% endblock %}
