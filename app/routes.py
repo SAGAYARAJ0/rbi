@@ -188,45 +188,54 @@ def get_graph_data():
 
 @bp.route('/api/recent-fines')
 def get_recent_fines():
-    """Endpoint to fetch recent fines data"""
+    """Return only the latest fines from uploads/temp_fines (fine N.json or recent_fines.json)."""
     try:
-        uploads_dir = os.path.join(current_app.root_path, '..', 'uploads')
-        recent_fines = []
-        
-        # Look for CSV files in uploads directory
-        for filename in os.listdir(uploads_dir):
-            if filename.startswith('results_') and filename.endswith('.csv'):
-                filepath = os.path.join(uploads_dir, filename)
-                with open(filepath, 'r', encoding='utf-8') as f:
-                    reader = csv.DictReader(f)
-                    for row in reader:
-                        # Parse penalty amount from the Penalty Range column
-                        penalty_range = row.get('Penalty Range', '')
-                        amount = 0
-                        if '₹' in penalty_range:
-                            try:
-                                # Extract the first number in the range
-                                amount_str = penalty_range.split('₹')[-1].split('–')[0].strip().replace(',', '')
-                                amount = float(amount_str) if amount_str.replace('.', '').isdigit() else 0
-                            except (ValueError, IndexError):
-                                amount = 0
-                        
-                        recent_fines.append({
-                            'circular': row.get('Circular / Direction', 'N/A'),
-                            'violation': row.get('Violation Type', 'N/A'),
-                            'penalty_range': penalty_range,
-                            'amount': amount,
-                            'legal_provision': row.get('Legal Provision Invoked', 'N/A'),
-                            'reason': row.get('Reason / Description', 'N/A'),
-                            'source_file': filename
-                        })
-        
-        # Sort by amount in descending order and get top 5
-        recent_fines = sorted(recent_fines, key=lambda x: x['amount'], reverse=True)[:5]
-        return jsonify(recent_fines)
-        
+        temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp_fines')
+        if not os.path.isdir(temp_dir):
+            return jsonify([])
+
+        # Prefer the canonical recent_fines.json if available
+        canonical = os.path.join(temp_dir, 'recent_fines.json')
+        if os.path.exists(canonical):
+            latest_path = canonical
+        else:
+            latest_path = None
+        latest_idx = -1
+        if not latest_path:
+            for name in os.listdir(temp_dir):
+                nl = name.lower()
+                if not nl.startswith('fine ') or not nl.endswith('.json'):
+                    continue
+                try:
+                    idx = int(nl.split(' ')[1].split('.')[0])
+                    if idx > latest_idx:
+                        latest_idx = idx
+                        latest_path = os.path.join(temp_dir, name)
+                except Exception:
+                    continue
+
+        if not latest_path or not os.path.exists(latest_path):
+            return jsonify([])
+
+        # Determine extracted date from file modified time
+        try:
+            mtime = os.path.getmtime(latest_path)
+            extracted_date = datetime.fromtimestamp(mtime).strftime('%d/%m/%Y')
+        except Exception:
+            extracted_date = None
+
+        with open(latest_path, 'r', encoding='utf-8') as jf:
+            data = json.load(jf)
+            items = data.get('items', [])
+            # attach extracted_date to each item
+            for it in items:
+                if extracted_date and 'extracted_date' not in it:
+                    it['extracted_date'] = extracted_date
+            items = sorted(items, key=lambda x: float(x.get('amount') or 0), reverse=True)[:10]
+            return jsonify(items)
+
     except Exception as e:
-        current_app.logger.error(f"Error fetching recent fines: {str(e)}")
+        current_app.logger.error(f"Error fetching recent fines (temp_fines): {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @bp.route('/')
@@ -455,6 +464,100 @@ def get_default_compliance_rules():
     """
     logging.warning("No compliance rules found in the database. Please add rules to the database.")
     return []
+
+@bp.route('/api/compliance-rules')
+def api_compliance_rules():
+    """Return compliance rules for display in UI."""
+    try:
+        rules = get_compliance_rules()
+        return jsonify(rules or [])
+    except Exception as e:
+        logging.error(f"Error fetching compliance rules: {str(e)}")
+        return jsonify([])
+
+@bp.route('/api/temp-fines', methods=['GET'])
+def api_temp_fines():
+    """List all recent fine snapshots from uploads/temp_fines as markdown-style entries.
+    Returns newest first with fields: name, created_from, items_count, ts, markdown.
+    """
+    try:
+        temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp_fines')
+        if not os.path.isdir(temp_dir):
+            return jsonify([])
+
+        entries = []
+        for name in os.listdir(temp_dir):
+            lower = name.lower()
+            if not (lower.startswith('fine ') and (lower.endswith('.md') or lower.endswith('.json'))):
+                continue
+        
+        # group by base name (fine N)
+        from collections import defaultdict
+        groups = defaultdict(dict)
+        for name in os.listdir(temp_dir):
+            lower = name.lower()
+            if not lower.startswith('fine '):
+                continue
+            base = ' '.join(name.split(' ')[:2])  # "fine N"
+            if name.endswith('.json'):
+                try:
+                    with open(os.path.join(temp_dir, name), 'r', encoding='utf-8') as jf:
+                        j = json.load(jf)
+                        groups[base]['created_from'] = j.get('created_from')
+                        groups[base]['items_count'] = len(j.get('items', []))
+                        groups[base]['items'] = (j.get('items', []) or [])[:100]
+                except Exception:
+                    pass
+            elif name.endswith('.md'):
+                try:
+                    with open(os.path.join(temp_dir, name), 'r', encoding='utf-8') as mf:
+                        groups[base]['markdown'] = mf.read()
+                except Exception:
+                    groups[base]['markdown'] = ''
+            groups[base]['name'] = base
+            try:
+                groups[base]['ts'] = os.path.getmtime(os.path.join(temp_dir, name))
+            except Exception:
+                groups[base]['ts'] = 0
+
+        entries = list(groups.values())
+        entries.sort(key=lambda e: e.get('ts', 0), reverse=True)
+        # format ts and default values
+        for e in entries:
+            try:
+                e['date'] = datetime.fromtimestamp(e.get('ts', 0)).strftime('%d/%m/%Y') if e.get('ts') else None
+            except Exception:
+                e['date'] = None
+            e['items_count'] = int(e.get('items_count') or 0)
+            e['markdown'] = e.get('markdown') or ''
+            e['created_from'] = e.get('created_from') or ''
+        return jsonify(entries)
+    except Exception as e:
+        current_app.logger.error(f"Error listing temp fines: {str(e)}")
+        return jsonify([])
+
+@bp.route('/api/temp-fines/files', methods=['GET'])
+def api_temp_fines_files():
+    """Return raw filenames available in uploads/temp_fines for quick folder-like view."""
+    try:
+        temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp_fines')
+        if not os.path.isdir(temp_dir):
+            return jsonify([])
+        files = sorted(os.listdir(temp_dir))
+        return jsonify(files)
+    except Exception as e:
+        current_app.logger.error(f"Error listing temp fines files: {str(e)}")
+        return jsonify([])
+
+@bp.route('/api/temp-fines/file/<path:filename>', methods=['GET'])
+def api_temp_fines_download(filename):
+    """Serve a specific temp fines file from the temp_fines directory."""
+    try:
+        temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp_fines')
+        return send_from_directory(temp_dir, filename, as_attachment=False)
+    except Exception as e:
+        current_app.logger.error(f"Error serving temp fines file {filename}: {str(e)}")
+        return jsonify({'error': 'File not found'}), 404
 
 @bp.route('/upload')
 def upload():
@@ -870,20 +973,34 @@ def _process_transaction_sheet(df, neo, sheet_name=None, kyc_data=None):
                 continue
                 
             # Initialize result with basic transaction info
+            amount = float(str(row[columns['amount']]).replace(',', '').replace('₹', '').replace('$', '').strip() or '0') if 'amount' in columns and pd.notna(row[columns['amount']]) else 0
             result = {
                 'row_id': idx,
                 'sheet': sheet_name or 'transactions',
                 'transaction_id': str(row[columns['transaction_id']]).strip() if 'transaction_id' in columns and pd.notna(row[columns['transaction_id']]) else None,
                 'sender_account': account_number,
                 'receiver': str(row[columns.get('receiver', '')]).strip() if 'receiver' in columns and pd.notna(row[columns.get('receiver', '')]) else None,
-                'amount': float(str(row[columns['amount']]).replace(',', '').replace('₹', '').replace('$', '').strip() or '0') if 'amount' in columns and pd.notna(row[columns['amount']]) else 0,
+                'amount': amount,
                 'date': str(row[columns.get('date', '')]) if 'date' in columns and pd.notna(row[columns.get('date', '')]) else None,
                 'violation_details': [],
                 'has_violation': False
             }
             
-            # Check for monthly deposit limit violation
-            if account_number in monthly_limit_violations:
+            # Check for high-value transactions (over ₹9,00,000)
+            if amount > 900000:
+                result['violation_details'].append({
+                    'violation_type': 'High Value Transaction',
+                    'legal_provision': 'RBI Master Direction on KYC 2016',
+                    'circular': 'RBI/2021-22/123',
+                    'penalty_min': 50000,
+                    'penalty_max': 200000,
+                    'reason': f'Transaction amount of ₹{amount:,.2f} exceeds the high-value threshold of ₹9,00,000',
+                    'risk_level': 'HIGH'
+                })
+                result['has_violation'] = True
+            
+            # Check for monthly deposit limit violation (only if not already flagged as high value)
+            if account_number in monthly_limit_violations and amount <= 900000:
                 for violation in monthly_limit_violations[account_number]:
                     result['violation_details'].append({
                         'violation_type': 'Monthly Deposit Limit Exceeded',
@@ -891,8 +1008,9 @@ def _process_transaction_sheet(df, neo, sheet_name=None, kyc_data=None):
                         'circular': 'INTERNAL/RISK/2023/001',
                         'penalty_min': 10000,
                         'penalty_max': 50000,
-                        'reason': f"Account exceeded monthly deposit limit of ₹10,000. Deposited ₹{violation['total_deposits']:.2f} in {violation['month']}",
-                        'excess_amount': violation['excess_amount']
+                        'reason': f"Account exceeded monthly deposit limit of ₹10,000. Deposited ₹{violation['total_deposits']:,.2f} in {violation['month']}",
+                        'excess_amount': violation['excess_amount'],
+                        'risk_level': 'MEDIUM' if violation['excess_amount'] < 100000 else 'HIGH'
                     })
                     result['has_violation'] = True
             
@@ -1072,9 +1190,12 @@ def _analyze_transaction_with_rules(transaction_row: Dict[str, Any], model):
     compliance_rules = [
         {
             "name": "High Value Transaction",
-            "description": "Any single transaction exceeding ₹1000 must be flagged for additional scrutiny.",
-            "condition": "isinstance(t.get('amount', 0), (int, float)) and float(t.get('amount', 0)) > 1000",
-            "risk_level": "HIGH"
+            "description": "Single transaction above ₹9,00,000 requires additional scrutiny",
+            "condition": "isinstance(t.get('amount', 0), (int, float)) and float(t.get('amount', 0)) > 900000",
+            "risk_level": "HIGH",
+            "penalty_min": 50000,
+            "penalty_max": 200000,
+            "legal_provision": "RBI Master Direction on KYC 2016"
         },
         {
             "name": "Non-compliance with KYC norms",
@@ -1168,10 +1289,12 @@ RBI COMPLIANCE RULES (in priority order):
 
 {transaction_details}
 
+IMPORTANT: Only flag transactions above ₹9,00,000 as high-value. Do not flag transactions below this amount as high-value under any circumstances.
+
 ANALYSIS INSTRUCTIONS:
 1. Review the transaction details carefully against each compliance rule
 2. Pay special attention to:
-   - Transaction amount (especially > ₹1000)
+   - Transaction amount (CRITICAL: Only flag if amount > ₹9,00,000)
    - Sender KYC status
    - Transaction mode and channel
    - Description text for any red flags
@@ -1179,8 +1302,9 @@ ANALYSIS INSTRUCTIONS:
 
 3. For each rule that is violated, include:
    - The exact rule name
-   - A brief explanation of how the transaction violates this rule
-   - The risk level (CRITICAL, HIGH, MEDIUM, or LOW)
+   - A clear, concise explanation of the violation without repeating the rule name or amount
+   - The risk level (CRITICAL, HIGH, MEDIUM, or LOW) - include this only once at the end
+   - For high value transactions, only include if amount is above ₹9,00,000
 
 4. If no rules are violated, respond with "No Violation"
 
@@ -1188,7 +1312,7 @@ RESPONSE FORMAT (strict JSON):
 {{
   "transaction_id": "{transaction_row.get('Transaction_ID', 'N/A')}",
   "matched_rules": ["Rule Name 1", "Rule Name 2"],
-  "explanation": "Detailed explanation of the violations found, including which parts of the transaction triggered which rules.",
+  "explanation": "Concise explanation of the specific violation without repeating the rule name or amount.",
   "kyc_status": "{sender_kyc_status}",
   "amount": {amount},
   "risk_level": "HIGHEST_RISK_LEVEL_FOUND"
@@ -1198,9 +1322,9 @@ EXAMPLE RESPONSE FOR VIOLATION:
 {{
   "transaction_id": "TXN12345",
   "matched_rules": ["High Value Transaction", "Lapses in cybersecurity compliance"],
-  "explanation": "Transaction amount of ₹1,200 exceeds the ₹1,000 threshold for high-value transactions. Additionally, the description contains 'suspicious activity' which triggers cybersecurity concerns.",
-  "kyc_status": "Verified",
-  "amount": 1200.0,
+  "explanation": "Transaction amount of ₹9,50,000 exceeds the ₹9,00,000 threshold for high-value transactions. This transaction requires additional scrutiny as per RBI guidelines.",
+  "kyc_status": "Verified,completed",
+  "amount": 950000.0,
   "risk_level": "CRITICAL"
 }}
 
@@ -1208,7 +1332,7 @@ EXAMPLE RESPONSE FOR NO VIOLATION:
 {{
   "transaction_id": "{transaction_row.get('Transaction_ID', 'N/A')}",
   "matched_rules": ["No Violation"],
-  "explanation": "This is a normal customer activity and does not violate any regulatory rules.",
+  "explanation": "This transaction is below the ₹9,00,000 threshold and shows no other signs of suspicious activity.",
   "kyc_status": "{sender_kyc_status}",
   "amount": {amount},
   "risk_level": "LOW"
@@ -1503,10 +1627,15 @@ def _process_excel_file(filepath: str) -> Dict[str, Any]:
         # Standardize column names
         df.columns = [str(col).strip() for col in df.columns]
         
-        # Find key columns
+        # Find key columns - Description column is optional for KYC datasets
         description_col = next((col for col in df.columns if 'description' in col.lower()), None)
-        if not description_col:
-            return {'error': 'Description column not found in Excel sheet'}
+        
+        # Check if this is a KYC compliance dataset
+        kyc_columns = [col for col in df.columns if 'kyc' in col.lower()]
+        is_kyc_dataset = len(kyc_columns) > 0
+        
+        if not description_col and not is_kyc_dataset:
+            return {'error': 'Description column not found in Excel sheet. This appears to be neither a transaction dataset nor a KYC compliance dataset.'}
         
         # Process only first 2 rows
         df = df.head(2)
@@ -1535,15 +1664,35 @@ def _process_excel_file(filepath: str) -> Dict[str, Any]:
                     transaction_data[clean_col] = row[col] if pd.notna(row[col]) else ''
                     logging.info(f"  - {clean_col}: {transaction_data[clean_col]}")
                 
-                # Get transaction description from the most likely column
+                # Get transaction description from the most likely column (optional for KYC datasets)
                 description_cols = [col for col in transaction_data.keys() 
                                  if 'desc' in col or 'note' in col or 'detail' in col or 'particular' in col]
-                description_col = description_cols[0] if description_cols else next(iter(transaction_data.keys()))
-                transaction_text = str(transaction_data.get(description_col, '')).strip()
+                
+                if description_cols:
+                    description_col = description_cols[0]
+                    transaction_text = str(transaction_data.get(description_col, '')).strip()
+                elif is_kyc_dataset:
+                    # For KYC datasets, use customer name or account number as identifier
+                    customer_cols = [col for col in transaction_data.keys() if 'customer' in col or 'name' in col]
+                    account_cols = [col for col in transaction_data.keys() if 'account' in col]
+                    
+                    if customer_cols:
+                        transaction_text = f"KYC Review for {transaction_data.get(customer_cols[0], 'Unknown Customer')}"
+                    elif account_cols:
+                        transaction_text = f"KYC Review for Account {transaction_data.get(account_cols[0], 'Unknown Account')}"
+                    else:
+                        transaction_text = f"KYC Compliance Review - Row {idx + 1}"
+                else:
+                    # For non-KYC datasets, try to use any available column
+                    description_col = next(iter(transaction_data.keys())) if transaction_data else None
+                    transaction_text = str(transaction_data.get(description_col, '')).strip() if description_col else ''
                 
                 if not transaction_text or transaction_text.lower() in ['nan', 'none', '']:
-                    logging.warning(f"⚠️  Skipping row {idx + 1}: No description found")
-                    continue
+                    if not is_kyc_dataset:
+                        logging.warning(f"⚠️  Skipping row {idx + 1}: No description found")
+                        continue
+                    else:
+                        transaction_text = f"KYC Compliance Review - Row {idx + 1}"
                 
                 logging.info(f"🔍 Analyzing transaction {idx + 1}/{total_rows}: {transaction_text[:100]}...")
                 
@@ -1564,9 +1713,9 @@ def _process_excel_file(filepath: str) -> Dict[str, Any]:
                     {
                         'id': 'high_value_transaction',
                         'name': 'High Value Transaction',
-                        'description': 'Single transaction exceeds ₹1000',
+                        'description': 'Transaction exceeds threshold',
                         'risk': 'HIGH',
-                        'condition': "isinstance(t.get('amount', 0), (int, float)) and float(t.get('amount', 0)) > 1000"
+                        'condition': "isinstance(t.get('amount', 0), (int, float)) and float(t.get('amount', 0)) > 900000"
                     },
                     # Suspicious transaction patterns
                     {
@@ -1642,7 +1791,8 @@ def _process_excel_file(filepath: str) -> Dict[str, Any]:
                 for rule in compliance_rules:
                     try:
                         # Skip KYC-related rules if KYC status is empty
-                        if 'kyc' in rule.get('name', '').lower() and not normalized_transaction.get('sender_kyc_status'):
+                        rule_name = rule.get('name', '')
+                        if rule_name and 'kyc' in rule_name.lower() and not normalized_transaction.get('sender_kyc_status'):
                             logging.debug(f"Skipping {rule.get('name')} - KYC status is empty")
                             continue
                             
@@ -1869,6 +2019,79 @@ def api_excel_process():
         }), 400
         
     try:
+        # Save a temp copy of fines for this upload in uploads/temp_fines as "fine N"
+        try:
+            temp_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp_fines')
+            os.makedirs(temp_dir, exist_ok=True)
+            # Determine next index
+            existing = [f for f in os.listdir(temp_dir) if f.lower().startswith('fine ') and (f.endswith('.json') or f.endswith('.md'))]
+            indices = []
+            for name in existing:
+                try:
+                    num = int(name.split(' ')[1].split('.')[0])
+                    indices.append(num)
+                except Exception:
+                    pass
+            next_idx = (max(indices) + 1) if indices else 1
+            base_name = f"fine {next_idx}"
+
+            # Build compact fines list from transactions with violations
+            fines_items = []
+            for tx in result.get('transactions', []):
+                if not tx or not tx.get('has_violation'):
+                    continue
+                for d in tx.get('violation_details', []) or []:
+                    pen_min = d.get('penalty_min') or 0
+                    pen_max = d.get('penalty_max') or 0
+                    penalty_range = ''
+                    try:
+                        if pen_min or pen_max:
+                            penalty_range = f"₹{int(pen_min):,} – ₹{int(pen_max):,}".replace(',', ',')
+                    except Exception:
+                        penalty_range = ''
+                    fines_items.append({
+                        'circular': d.get('circular') or 'N/A',
+                        'violation': d.get('violation_type') or 'Violation',
+                        'penalty_range': penalty_range,
+                        'amount': float(pen_max or pen_min or tx.get('amount') or 0),
+                        'legal_provision': d.get('legal_provision') or 'N/A',
+                        'reason': d.get('reason') or '',
+                        'source_file': filename,
+                    })
+
+            # Write JSON
+            json_path = os.path.join(temp_dir, base_name + '.json')
+            with open(json_path, 'w', encoding='utf-8') as jf:
+                jf.write(json.dumps({'created_from': filename, 'items': fines_items}, ensure_ascii=False, indent=2))
+
+            # Also write/update a canonical recent_fines.json for easy access
+            try:
+                recent_json_path = os.path.join(temp_dir, 'recent_fines.json')
+                payload = {
+                    'created_from': filename,
+                    'label': base_name,
+                    'items': fines_items
+                }
+                with open(recent_json_path, 'w', encoding='utf-8') as rjf:
+                    rjf.write(json.dumps(payload, ensure_ascii=False, indent=2))
+            except Exception as rerr:
+                current_app.logger.warning(f"Could not write recent_fines.json: {rerr}")
+
+            # Write simple markdown summary
+            md_lines = [
+                f"# {base_name}",
+                "",
+                f"Source: {filename}",
+                "",
+            ]
+            for it in fines_items[:50]:
+                md_lines.append(f"- **Violation**: {it['violation']} | **Penalty**: {it.get('penalty_range') or 'N/A'} | **Law**: {it.get('legal_provision')} | **Reason**: {it.get('reason')}")
+            md_path = os.path.join(temp_dir, base_name + '.md')
+            with open(md_path, 'w', encoding='utf-8') as mf:
+                mf.write("\n".join(md_lines))
+        except Exception as save_err:
+            current_app.logger.warning(f"Could not save temp fines set: {save_err}")
+
         return jsonify({
             'success': True,
             'results': {

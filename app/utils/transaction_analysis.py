@@ -58,7 +58,8 @@ class TransactionAnalyzer:
             query = """
             MATCH (a:Account {number: $account_number})-[:HAS_VIOLATION]->(v:Violation)
             WHERE v.type CONTAINS 'KYC' AND v.status = 'ACTIVE'
-            RETURN v.type as violation_type, v.date as violation_date
+            RETURN v.type as violation_type, v.date as violation_date, v.details as details
+            ORDER BY v.date DESC
             LIMIT 1
             """
             with self.neo4j._driver.session() as session:
@@ -66,13 +67,15 @@ class TransactionAnalyzer:
                 record = result.single()
                 
                 if record:
+                    # Use the stored violation details if available, otherwise use a default message
+                    explanation = record.get("details") or "KYC compliance issue detected"
                     return {
                         "transaction_id": None,
                         "violation_type": record["violation_type"],
                         "status": "Violation",
                         "severity": "HIGH",
-                        "explanation": "Customer KYC is incomplete or invalid - HIGH risk",
-                        "rule": "Non-compliance with KYC norms"
+                        "explanation": explanation,
+                        "rule": "KYC Compliance"
                     }
         except Exception as e:
             logging.error(f"Error checking KYC violations: {str(e)}")
@@ -95,7 +98,8 @@ class TransactionAnalyzer:
             query = """
             MATCH (t:Transaction)-[:MADE_BY]->(a:Account {number: $account_number})
             WHERE t.date >= date($month_start) AND t.date <= date($month_end)
-            RETURN COALESCE(SUM(toFloat(t.amount)), 0) as monthly_total
+            RETURN COALESCE(SUM(toFloat(t.amount)), 0) as monthly_total,
+                   COUNT(t) as transaction_count
             """
             
             with self.neo4j._driver.session() as session:
@@ -105,20 +109,16 @@ class TransactionAnalyzer:
                     month_start=month_start,
                     month_end=month_end
                 )
-                monthly_total = result.single()["monthly_total"] or 0
+                record = result.single()
                 
-                # Add current transaction amount
-                monthly_total += amount
-                
-                if monthly_total > self.monthly_threshold:
+                if record and record["monthly_total"] > self.monthly_threshold:
                     return {
                         "transaction_id": None,
-                        "violation_type": "MONTHLY_THRESHOLD_EXCEEDED",
-                        "status": "Warning",
-                        "severity": "MEDIUM",
-                        "explanation": f"Customer exceeded the monthly transaction threshold by transacting "
-                                    f"₹{monthly_total:,.2f} (threshold: ₹{self.monthly_threshold:,.2f}).",
-                        "rule": "Breach of digital lending norms"
+                        "violation_type": "Monthly Threshold Exceeded",
+                        "status": "Violation",
+                        "severity": "HIGH",
+                        "explanation": f"Monthly transaction limit of ₹{self.monthly_threshold:,.2f} exceeded (Current: ₹{record['monthly_total']:,.2f} across {record['transaction_count']} transactions)",
+                        "rule": "Monthly Transaction Limit"
                     }
                     
         except Exception as e:
@@ -129,47 +129,57 @@ class TransactionAnalyzer:
     def _check_suspicious_patterns(self, transaction: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Check for suspicious transaction patterns."""
         amount = float(transaction.get('amount', 0))
-        description = (transaction.get('description') or '').lower()
+        description = str(transaction.get('description', '')).lower()
         
-        # Check for round number transactions (potential structuring)
-        if amount % 10000 == 0 and amount > 0:
+        # Check for high-value transactions (over ₹9,00,000)
+        if amount > 900000:
             return {
                 "transaction_id": transaction.get('transaction_id'),
-                "violation_type": "SUSPICIOUS_ROUND_AMOUNT",
-                "status": "Warning",
-                "severity": "LOW",
-                "explanation": f"Round number transaction of ₹{amount:,.2f} detected. "
-                             "This could indicate potential structuring behavior.",
+                "violation_type": "High Value Transaction",
+                "status": "Review Required",
+                "severity": "HIGH",
+                "explanation": f"Transaction amount of ₹{amount:,.2f} exceeds the ₹9,00,000 threshold for high-value transactions",
+                "rule": "High Value Transaction Monitoring",
+                "penalty_min": 50000,
+                "penalty_max": 200000,
+                "legal_provision": "RBI Master Direction on KYC 2016"
+            }
+            
+        # Check for round number transactions (only flag very large amounts)
+        if amount > 100000 and amount % 100000 == 0:
+            return {
+                "transaction_id": transaction.get('transaction_id'),
+                "violation_type": "Suspicious Transaction Pattern",
+                "status": "Review Required",
+                "severity": "MEDIUM",
+                "explanation": f"Large round number transaction of ₹{amount:,.2f} detected",
                 "rule": "Suspicious Transaction Monitoring"
             }
             
-        # Check for high-value transactions
-        if amount > 100000:  # 1 lakh threshold
-            return {
-                "transaction_id": transaction.get('transaction_id'),
-                "violation_type": "HIGH_VALUE_TRANSACTION",
-                "status": "Alert",
-                "severity": "HIGH",
-                "explanation": f"High-value transaction of ₹{amount:,.2f} detected. "
-                             "This may require additional verification.",
-                "rule": "High-Value Transaction Monitoring"
-            }
-            
-        # Check for suspicious keywords in description
-        suspicious_keywords = [
-            'gambling', 'casino', 'bet', 'lottery', 'crypto', 'bitcoin',
-            'forex', 'offshore', 'anonymous', 'prepaid card', 'gift card'
-        ]
+        # Check for common suspicious keywords with context
+        suspicious_terms = {
+            'loan': "Potential unauthorized loan processing",
+            'repayment': "Suspicious repayment pattern",
+            'settlement': "Unusual settlement transaction",
+            'cash': "High-risk cash transaction",
+            'withdrawal': "Suspicious withdrawal pattern",
+            'forex': "Potential forex violation",
+            'offshore': "Suspicious offshore activity",
+            'anonymous': "Anonymous transaction detected",
+            'prepaid card': "High-risk prepaid card activity",
+            'gift card': "Suspicious gift card transaction"
+        }
         
-        for keyword in suspicious_keywords:
-            if keyword in description:
+        # Check for suspicious terms in transaction description
+        for term, message in suspicious_terms.items():
+            if term in description:
                 return {
                     "transaction_id": transaction.get('transaction_id'),
-                    "violation_type": "SUSPICIOUS_KEYWORD_DETECTED",
-                    "status": "Warning",
+                    "violation_type": "Suspicious Activity Detected",
+                    "status": "Review Required",
                     "severity": "MEDIUM",
-                    "explanation": f"Suspicious keyword '{keyword}' found in transaction description.",
-                    "rule": "Suspicious Transaction Monitoring"
+                    "explanation": message,
+                    "rule": "Transaction Monitoring"
                 }
                 
         return None

@@ -37,6 +37,17 @@
                     </form>
                     
                     <div id="excel-results" class="mt-4"></div>
+                
+                    <!-- Recent Fines (Temp Folder)
+                    <div class="mt-5">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <a href="/api/temp-fines/files" target="_blank" id="openTempFolder" class="text-decoration-none">
+                                <i class="fas fa-folder-open me-2"></i>Recent Fines (Temp)
+                              </a>
+                            <button class="btn btn-sm btn-outline-primary" id="refreshTempFines"><i class="fas fa-sync-alt me-1"></i>Refresh</button>
+                        </div>
+                        <div id="tempFinesList" class="list-group"></div>
+                    </div> -->
                 </div>
             </div>
         </div>
@@ -92,6 +103,12 @@ $(document).ready(function() {
                 if (response.status === 'success') {
                     showResults(response.data);
                     showAlert('File processed successfully!', 'success');
+                    // Save compact recent fines to localStorage for dashboard
+                    try {
+                        saveTempRecentFines(response.data);
+                    } catch (e) {
+                        console.warn('Could not cache recent fines locally:', e);
+                    }
                 } else {
                     showAlert('Error: ' + (response.message || 'Unknown error occurred'), 'danger');
                 }
@@ -131,6 +148,189 @@ $(document).ready(function() {
         setTimeout(function() {
             $('.alert-dismissible').alert('close');
         }, 5000);
+    }
+
+    // -------- Recent Temp Fines UI --------
+    function loadTempFines() {
+        const container = document.getElementById('tempFinesList');
+        if (!container) return;
+        container.innerHTML = '<div class="text-muted">Loading...</div>';
+        fetch('/api/temp-fines')
+            .then(r => r.json())
+            .then(list => {
+                if (!Array.isArray(list) || list.length === 0) {
+                    container.innerHTML = '<div class="text-muted">No recent fines found.</div>';
+                    return;
+                }
+                container.innerHTML = list.map(entry => {
+                    const title = `${entry.name || ''} (${entry.items_count || 0} items)`;
+                    const sub = `${entry.date || ''} • ${entry.created_from || ''}`;
+                    const md = (entry.markdown || '').split('\n').slice(0, 8).join('\n');
+                    return `
+                        <a href="#" class="list-group-item list-group-item-action" data-md="${encodeURIComponent(entry.markdown || '')}" data-title="${encodeURIComponent(title)}" data-items='${JSON.stringify(entry.items || [])}'>
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">${title}</h6>
+                                <small class="text-muted">${sub}</small>
+                            </div>
+                            <pre class="mb-0 small text-muted" style="white-space: pre-wrap;">${md || '—'}</pre>
+                        </a>`;
+                }).join('');
+
+                // click to view full markdown in modal
+                $('#tempFinesList a').on('click', function(e) {
+                    e.preventDefault();
+                    const title = decodeURIComponent($(this).data('title'));
+                    const md = decodeURIComponent($(this).data('md'));
+                    const items = $(this).data('items') || [];
+                    const modal = $(
+                        `<div class="modal fade" tabindex="-1">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">${title}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <div class="mb-3">
+                                            <h6 class="mb-2">Summary (Markdown)</h6>
+                                            <pre style="white-space: pre-wrap;">${md || 'No content'}</pre>
+                                        </div>
+                                        <div>
+                                            <h6 class="mb-2">Fine Items</h6>
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-striped">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Violation</th>
+                                                            <th>Penalty</th>
+                                                            <th>Law</th>
+                                                            <th>Reason</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        ${items.map(it => `
+                                                            <tr>
+                                                                <td>${(it.violation||'N/A')}</td>
+                                                                <td>${(it.penalty_range||'')}</td>
+                                                                <td>${(it.legal_provision||'')}</td>
+                                                                <td>${(it.reason||'')}</td>
+                                                            </tr>
+                                                        `).join('')}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`
+                    );
+                    $('body').append(modal);
+                    const bsModal = new bootstrap.Modal(modal[0]);
+                    bsModal.show();
+                    modal.on('hidden.bs.modal', function(){ modal.remove(); });
+                });
+            })
+            .catch(() => {
+                container.innerHTML = '<div class="text-danger">Failed to load recent fines.</div>';
+            });
+    }
+
+    // initial load and refresh
+    loadTempFines();
+    document.getElementById('refreshTempFines')?.addEventListener('click', function(){ loadTempFines(); });
+    document.getElementById('openTempFolder')?.addEventListener('click', function(e){
+        e.preventDefault();
+        const container = document.getElementById('tempFinesList');
+        container.innerHTML = '<div class="text-muted">Loading files...</div>';
+        fetch('/api/temp-fines/files')
+            .then(r => r.json())
+            .then(files => {
+                if (!Array.isArray(files) || !files.length) {
+                    container.innerHTML = '<div class="text-muted">No files in temp_fines.</div>';
+                    return;
+                }
+                container.innerHTML = files.map(f => `
+                    <a href="/api/temp-fines/file/${encodeURIComponent(f)}" target="_blank" class="list-group-item list-group-item-action">
+                        <i class="fas fa-file me-2"></i>${f}
+                    </a>
+                `).join('');
+            })
+            .catch(() => { container.innerHTML = '<div class="text-danger">Failed to list files.</div>'; });
+    });
+
+    // Build and cache a compact list of recent fines for the dashboard
+    function saveTempRecentFines(data) {
+        if (!data) return;
+        const now = Date.now();
+        const items = [];
+        let md = '# Recent Fines (Latest Upload)\n\n';
+
+        // From detailed transaction violations
+        if (Array.isArray(data.violations)) {
+            data.violations.forEach(function(v) {
+                if (!v || !v.has_violation || !Array.isArray(v.violation_details)) return;
+                v.violation_details.forEach(function(d) {
+                    const amtMin = Number(d.penalty_min || 0);
+                    const amtMax = Number(d.penalty_max || 0);
+                    const pr = (amtMin || amtMax)
+                        ? ('₹' + amtMin.toLocaleString('en-IN') + ' – ₹' + amtMax.toLocaleString('en-IN'))
+                        : '';
+                    items.push({
+                        circular: d.circular || 'N/A',
+                        violation: d.violation_type || 'Violation',
+                        penalty_range: pr,
+                        amount: Number(d.penalty_max || d.penalty_min || v.amount || 0) || 0,
+                        legal_provision: d.legal_provision || 'N/A',
+                        reason: d.reason || '',
+                        source_file: 'excel_upload',
+                        ts: now
+                    });
+
+                    md += `- **Violation**: ${d.violation_type || 'Violation'}  ` +
+                          `| **Penalty**: ${pr || 'N/A'}  ` +
+                          `| **Law**: ${d.legal_provision || 'N/A'}  ` +
+                          `| **Reason**: ${d.reason || ''}\n`;
+                });
+            });
+        }
+
+        // From monthly limit violations summary
+        if (data.monthly_limit_violations && typeof data.monthly_limit_violations === 'object') {
+            Object.values(data.monthly_limit_violations).forEach(function(list) {
+                (list || []).forEach(function(entry) {
+                    const pmin = Number(entry.penalty_min || 0);
+                    const pmax = Number(entry.penalty_max || 0);
+                    const pr2 = (pmin || pmax)
+                        ? ('₹' + pmin.toLocaleString('en-IN') + ' – ₹' + pmax.toLocaleString('en-IN'))
+                        : '';
+                    items.push({
+                        circular: 'N/A',
+                        violation: 'Monthly Deposit Limit Exceeded',
+                        penalty_range: pr2,
+                        amount: Number(entry.penalty_max || entry.penalty_min || entry.excess_amount || 0) || 0,
+                        legal_provision: entry.legal_provision || 'N/A',
+                        reason: entry.reason || 'Exceeded configured monthly deposit threshold',
+                        source_file: 'excel_upload',
+                        ts: now
+                    });
+
+                    md += `- **Violation**: Monthly Deposit Limit Exceeded  ` +
+                          `| **Penalty**: ${pr2 || 'N/A'}  ` +
+                          `| **Note**: ${entry.reason || 'Exceeded configured monthly deposit threshold'}\n`;
+                });
+            });
+        }
+
+        if (items.length === 0) return;
+
+        // Overwrite previous cache; show only the latest upload on dashboard
+        const key = 'temp_recent_fines';
+        localStorage.setItem(key, JSON.stringify(items.slice(0, 15)));
+        localStorage.setItem('temp_recent_fines_md', md);
     }
     
     // Show results function
@@ -249,7 +449,7 @@ $(document).ready(function() {
                     html += '<tr class="table-active">' +
                         '<td colspan="5" class="p-0">' +
                         '<div class="p-3 bg-light">' +
-                        '<h6>Violation Details:</h6>' +
+                        '<h6>Violation Details:</h6>' + 
                         '<div class="row">';
                     
                     violation.violation_details.forEach(function(detail) {

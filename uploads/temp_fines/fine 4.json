@@ -1,0 +1,77 @@
+{
+  "created_from": "RBI_KYC_Compliance_Dataset_200_Rows.xlsx",
+  "items": [
+    {
+      "circular": "RBI/2022-23/123",
+      "violation": "Customer Complaint Violation",
+      "penalty_range": "₹10,000 – ₹100,000",
+      "amount": 100000.0,
+      "legal_provision": "RBI Master Direction",
+      "reason": "Potential violation of customer protection norms based on complaint indicators - HIGH risk",
+      "source_file": "RBI_KYC_Compliance_Dataset_200_Rows.xlsx"
+    },
+    {
+      "circular": "RBI/2022-23/123",
+      "violation": "Breach of digital lending norms",
+      "penalty_range": "₹10,000 – ₹100,000",
+      "amount": 100000.0,
+      "legal_provision": "RBI Master Direction",
+      "reason": "Direct loan disbursement, APR disclosures, no automatic credit limit increases without consent. - HIGH risk",
+      "source_file": "RBI_KYC_Compliance_Dataset_200_Rows.xlsx"
+    },
+    {
+      "circular": "RBI/2022-23/123",
+      "violation": "Large Transaction Monitoring",
+      "penalty_range": "₹5,000 – ₹50,000",
+      "amount": 50000.0,
+      "legal_provision": "RBI Master Direction",
+      "reason": "Transactions ≥ ₹1,00,000 must be reported to FIU-IND - MEDIUM risk",
+      "source_file": "RBI_KYC_Compliance_Dataset_200_Rows.xlsx"
+    },
+    {
+      "circular": "RBI/2022-23/123",
+      "violation": "Suspicious Transaction Pattern",
+      "penalty_range": "₹10,000 – ₹100,000",
+      "amount": 100000.0,
+      "legal_provision": "RBI Master Direction",
+      "reason": "Transaction pattern appears suspicious based on customer profile - HIGH risk",
+      "source_file": "RBI_KYC_Compliance_Dataset_200_Rows.xlsx"
+    },
+    {
+      "circular": "RBI/2022-23/123",
+      "violation": "Customer Complaint Violation",
+      "penalty_range": "₹10,000 – ₹100,000",
+      "amount": 100000.0,
+      "legal_provision": "RBI Master Direction",
+      "reason": "Potential violation of customer protection norms based on complaint indicators - HIGH risk",
+      "source_file": "RBI_KYC_Compliance_Dataset_200_Rows.xlsx"
+    },
+    {
+      "circular": "RBI/2022-23/123",
+      "violation": "Breach of digital lending norms",
+      "penalty_range": "₹10,000 – ₹100,000",
+      "amount": 100000.0,
+      "legal_provision": "RBI Master Direction",
+      "reason": "Direct loan disbursement, APR disclosures, no automatic credit limit increases without consent. - HIGH risk",
+      "source_file": "RBI_KYC_Compliance_Dataset_200_Rows.xlsx"
+    },
+    {
+      "circular": "RBI/2022-23/123",
+      "violation": "Large Transaction Monitoring",
+      "penalty_range": "₹5,000 – ₹50,000",
+      "amount": 50000.0,
+      "legal_provision": "RBI Master Direction",
+      "reason": "Transactions ≥ ₹1,00,000 must be reported to FIU-IND - MEDIUM risk",
+      "source_file": "RBI_KYC_Compliance_Dataset_200_Rows.xlsx"
+    },
+    {
+      "circular": "RBI/2022-23/123",
+      "violation": "Suspicious Transaction Pattern",
+      "penalty_range": "₹10,000 – ₹100,000",
+      "amount": 100000.0,
+      "legal_provision": "RBI Master Direction",
+      "reason": "Transaction pattern appears suspicious based on customer profile - HIGH risk",
+      "source_file": "RBI_KYC_Compliance_Dataset_200_Rows.xlsx"
+    }
+  ]
+}

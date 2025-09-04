@@ -44,7 +44,7 @@
                                     <i class="fas fa-exclamation-triangle text-danger"></i>
                                 </div>
                                 <div>
-                                    <h6 class="text-uppercase text-muted mb-0 small">Violations</h6>
+                                    <h6 class="text-uppercase text-muted mb-0 small">Rules</h6>
                                     <h4 class="mb-0">{{ "{:,}".format(total_violations or 0) }}</h4>
                                 </div>
                             </div>
@@ -110,6 +110,9 @@
                             <div class="d-flex align-items-center">
                                 <div class="bg-primary bg-opacity-10 p-2 rounded-circle me-2">
                                     <i class="fas fa-comment-dots text-primary"></i>
+
+
+                                    
                                 </div>
                                 <div>
                                     <h6 class="text-uppercase text-muted mb-0 small">Reasons</h6>
@@ -241,22 +244,7 @@
         </div>
     </div>
     
-    <!-- Relationship Distribution Chart -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card h-100">
-                <div class="card-header bg-white border-0">
-                    <h5 class="card-title mb-0">Relationship Distribution</h5>
-                </div>
-                <div class="card-body">
-                    <div class="chart-area">
-                        <canvas id="relationshipChart" height="300"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
+  
     <!-- Bottom Row -->
     <div class="row g-4">
         <!-- Recent Fines -->
@@ -553,15 +541,21 @@ function loadRecentFines() {
             </td>
         </tr>`;
     
-    // Fetch recent fines data
-    fetch('/api/recent-fines')
-        .then(response => response.json())
-        .then(data => {
+    // If there is a latest Excel upload, prefer only that; otherwise fall back to API
+    const local = (() => { try { return JSON.parse(localStorage.getItem('temp_recent_fines') || '[]'); } catch(_) { return []; } })();
+    const useOnlyLocal = Array.isArray(local) && local.length > 0;
+    const apiPromise = useOnlyLocal ? Promise.resolve([]) : fetch('/api/recent-fines').then(r=>r.json());
+
+    apiPromise.then(data => {
+            if (useOnlyLocal) {
+                data = local;
+            }
+
             if (data.error) {
                 throw new Error(data.error);
             }
             
-            if (data.length === 0) {
+            if (!data || data.length === 0) {
                 tbody.innerHTML = `
                     <tr>
                         <td colspan="3" class="text-center py-4 text-muted">
@@ -588,7 +582,7 @@ function loadRecentFines() {
                     </td>
                     <td class="text-nowrap">
                         <span class="badge bg-danger bg-opacity-10 text-danger">
-                            ₹${fine.amount.toLocaleString() || '0'}
+                            ₹${(Number(fine.amount) || 0).toLocaleString('en-IN')}
                         </span>
                     </td>
                     <td>
@@ -613,6 +607,30 @@ function loadRecentFines() {
                 
                 tbody.appendChild(row);
             });
+
+            // Update the Fines Trend chart based on recent fines amounts
+            try {
+                const trendData = (data || []).map((f, idx) => ({
+                    date: f.extracted_date || `Fine ${idx + 1}`,
+                    amount: Number(f.amount) || 0
+                }));
+                if (trendData.length) {
+                    initFinesTrendChart(trendData);
+                }
+            } catch (_) { /* ignore */ }
+
+            // Build violation type distribution for pie chart from recent fines
+            try {
+                const counts = {};
+                (data || []).forEach(f => {
+                    const key = (f.violation && String(f.violation).trim()) ? String(f.violation).trim() : 'Unknown';
+                    counts[key] = (counts[key] || 0) + 1;
+                });
+                const violationData = Object.keys(counts).map(k => ({ type: k, count: counts[k] }));
+                if (violationData.length) {
+                    initViolationTypesChart(violationData);
+                }
+            } catch (_) { /* ignore */ }
         })
         .catch(error => {
             console.error('Error loading recent fines:', error);

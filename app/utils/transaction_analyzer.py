@@ -65,7 +65,7 @@ class TransactionAnalyzer:
                 record = result.single()
                 
                 if record:
-                    return {
+                    return { 
                         "transaction_id": None,
                         "violation_type": record["violation_type"],
                         "status": "Violation",
